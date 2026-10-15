@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-app-v2
+  namespace: memory-app
+  labels:
+    app: python-app
+    version: v2
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: python-app
+      version: v2
+
+  template:
+    metadata:
+      labels:
+        app: python-app
+        version: v2
+
+    spec:
+      serviceAccountName: python-app-sa
+      automountServiceAccountToken: false
+
+      # Pod-level security settings
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: python-app
+          image: kiruthik067/memory-app:v2
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          envFrom:
+            - configMapRef:
+                name: memory-app-config
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 400Mi
+
+          # Container-level security settings
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: app-config
+              mountPath: /etc/python-app
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+
+      volumes:
+        - name: app-config
+          configMap:
+            name: memory-app-config
+
+        - name: tmp
+          emptyDir: {}
