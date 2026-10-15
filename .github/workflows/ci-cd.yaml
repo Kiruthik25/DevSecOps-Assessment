@@ -1,0 +1,118 @@
+name: Release Images and Update Manifests
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "app/deploy/base/**"
+      - ".github/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build and Push ${{ matrix.version }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: true
+      matrix:
+        version: [v1, v2, v3]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate commit tag
+        id: version
+        shell: bash
+        run: |
+          echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          push: true
+          tags: |
+            docker.io/kiruthik067/memory-app:${{ matrix.version }}
+            docker.io/kiruthik067/memory-app:${{ matrix.version }}-${{ steps.version.outputs.sha_tag }}
+
+  update-manifests:
+    name: Open Manifest Update PR
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        shell: bash
+        run: |
+          sudo wget -q \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
+            -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update Deployment image tags
+        shell: bash
+        env:
+          IMAGE_OWNER: kiruthik067
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          SHORT_SHA="${SHORT_SHA:0:12}"
+
+          find app/deploy/base -type f \
+            \( -name '*.yaml' -o -name '*.yml' \) \
+            -print0 |
+          while IFS= read -r -d '' file; do
+            for version in v1 v2 v3; do
+              deployment="python-app-${version}"
+
+              if [ "$(yq '.metadata.name // ""' "$file")" = "$deployment" ]; then
+                IMAGE="docker.io/${IMAGE_OWNER}/memory-app:${version}-${SHORT_SHA}" \
+                yq -i \
+                  '(.spec.template.spec.containers[] | select(.name == "python-app").image) = strenv(IMAGE)' \
+                  "$file"
+
+                echo "Updated $deployment in $file"
+              fi
+            done
+          done
+
+      - name: Create manifest update PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GH_PAT }}
+          branch: automation/update-image-tags-${{ github.sha }}
+          delete-branch: true
+          commit-message: "chore(gitops): update application image tags"
+          title: "chore(gitops): update image tags"
+          body: |
+            Automated GitOps image update.
+
+            Images were built and pushed by the release workflow.
+            This PR updates the v1, v2, and v3 Deployment manifests
+            to use commit-specific image tags.
+          base: main
