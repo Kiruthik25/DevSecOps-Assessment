@@ -1,0 +1,40 @@
+
+alertmanager:
+  alertmanagerSpec:
+    secrets:
+      - alertmanager-smtp-secret
+
+  config:
+    global:
+      smtp_smarthost: "smtp.gmail.com:587"
+      smtp_from: "kiruthik67@gmail.com"
+      smtp_auth_username: "kiruthik67@gmail.com"
+      smtp_auth_password_file: "/etc/alertmanager/secrets/alertmanager-smtp-secret/smtp-auth-password"
+      smtp_require_tls: true
+
+    route:
+      receiver: "null"
+      group_by:
+        - alertname
+        - namespace
+        - pod
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - receiver: "devops-email"
+          matchers:
+            - 'alertname="KubernetesPodNotReady"'
+
+        - receiver: "devops-email"
+          matchers:
+            - 'alertname="KubernetesContainerOOMKilled"'
+
+    receivers:
+      - name: "null"
+
+      - name: "devops-email"
+        email_configs:
+          - to: "kiruthik67@gmail.com"
+            send_resolved: true
+
