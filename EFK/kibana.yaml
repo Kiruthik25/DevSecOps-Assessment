@@ -1,0 +1,22 @@
+
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: efk
+  namespace: logging
+spec:
+  version: 9.5.5
+  count: 1
+  elasticsearchRef:
+    name: efk
+  podTemplate:
+    spec:
+      containers:
+        - name: kibana
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+              cpu: "1"
