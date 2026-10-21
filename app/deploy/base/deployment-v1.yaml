@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: python-app
-          image: docker.io/kiruthik067/memory-app:v1-83cee2de4626
+          image: docker.io/kiruthik067/memory-app:v1-6a8991f6cac1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
