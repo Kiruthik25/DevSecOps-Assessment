@@ -8,6 +8,9 @@ on:
       - "app/deploy/base/**"
       - ".github/**"
       - "**/README.md"
+      - "**/*.png"
+      - "**/*.jpg"
+      - "**/*.txt"
   workflow_dispatch:
 
 permissions:
