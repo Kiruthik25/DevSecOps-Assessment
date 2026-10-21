@@ -7,6 +7,7 @@ on:
     paths-ignore:
       - "app/deploy/base/**"
       - ".github/**"
+      - "**/README.md"
   workflow_dispatch:
 
 permissions:
