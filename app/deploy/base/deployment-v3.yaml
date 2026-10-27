@@ -1,3 +1,4 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +21,7 @@ spec:
     spec:
       serviceAccountName: python-app-sa
       automountServiceAccountToken: false
+
       # Pod-level security settings
       securityContext:
         runAsNonRoot: true
@@ -27,16 +29,20 @@ spec:
         runAsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
+
       containers:
         - name: python-app
           image: docker.io/kiruthik067/memory-app:v3-83cee2de4626
           imagePullPolicy: IfNotPresent
+
           ports:
             - name: http
               containerPort: 8080
+
           envFrom:
             - configMapRef:
                 name: memory-app-config
+
           resources:
             requests:
               cpu: 100m
@@ -44,6 +50,7 @@ spec:
             limits:
               cpu: 500m
               memory: 400Mi
+
           # Container-level security settings
           securityContext:
             allowPrivilegeEscalation: false
@@ -51,20 +58,30 @@ spec:
             capabilities:
               drop:
                 - ALL
+
           volumeMounts:
             - name: app-config
               mountPath: /etc/python-app
               readOnly: true
             - name: tmp
               mountPath: /tmp
+
+          # Checks whether the application is ready to receive traffic
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthcheck
               port: http
+              scheme: HTTP
             periodSeconds: 5
+
+          # Restarts the container if the application stops responding
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /healthcheck
               port: http
+              scheme: HTTP
             periodSeconds: 10
+
       volumes:
         - name: app-config
           configMap:
